@@ -7,10 +7,11 @@ use crate::{
         response::ApiResponse,
     },
     services::download_service::DownloadService,
+    settings,
 };
 
 pub async fn start_download(
-    State(config): State<Config>,
+    State(_): State<Config>,
     Json(payload): Json<DownloadRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     if payload.url.trim().is_empty() {
@@ -19,23 +20,35 @@ pub async fn start_download(
 
     let quality = payload.quality.unwrap_or_else(|| "best".to_string());
     let format = payload.format.unwrap_or_else(|| "mp4".to_string());
-    let folder = payload.folder.unwrap_or_else(|| config.download_dir.clone());
+    let current = settings::load();
+    let folder = payload.folder.unwrap_or_else(|| {
+        if payload.download_type.as_deref() == Some("music") {
+            current.music_dir.clone()
+        } else {
+            current.video_dir.clone()
+        }
+    });
     let download_type = payload.download_type.unwrap_or_else(|| "video".to_string());
 
     let service = DownloadService::new();
-    let title = match download_type.as_str() {
+    let file_path = match download_type.as_str() {
         "stream" => service.start_stream_download(&payload.url, &quality, &format, &folder).await?,
         _ => service.start_download(&payload.url, &quality, &format, &folder).await?,
     };
 
+    let file_name = std::path::Path::new(&file_path)
+        .file_name()
+        .map(|f| f.to_string_lossy().to_string())
+        .unwrap_or_else(|| file_path.clone());
+
     let item = DownloadItem {
         id: 0,
         url: payload.url,
-        title: Some(title),
+        title: Some(file_name),
         status: "completed".to_string(),
         progress: 100.0,
         download_type: Some(download_type),
-        download_path: Some(folder),
+        download_path: Some(file_path),
         created_at: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
     };
 
@@ -44,7 +57,7 @@ pub async fn start_download(
 }
 
 pub async fn start_playlist_download(
-    State(config): State<Config>,
+    State(_): State<Config>,
     Json(payload): Json<PlaylistRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     if payload.url.trim().is_empty() {
@@ -53,22 +66,28 @@ pub async fn start_playlist_download(
 
     let quality = payload.quality.unwrap_or_else(|| "best".to_string());
     let format = payload.format.unwrap_or_else(|| "mp3".to_string());
-    let folder = payload.folder.unwrap_or_else(|| config.download_dir.clone());
+    let current = settings::load();
+    let folder = payload.folder.unwrap_or_else(|| current.music_dir.clone());
     let album_structure = payload.album_structure.unwrap_or(false);
 
     let service = DownloadService::new();
-    let result = service
+    let file_path = service
         .start_playlist_download(&payload.url, &quality, &format, &folder, album_structure)
         .await?;
+
+    let file_name = std::path::Path::new(&file_path)
+        .file_name()
+        .map(|f| f.to_string_lossy().to_string())
+        .unwrap_or_else(|| file_path.clone());
 
     let item = DownloadItem {
         id: 0,
         url: payload.url,
-        title: Some(result),
+        title: Some(file_name),
         status: "completed".to_string(),
         progress: 100.0,
         download_type: Some("playlist".to_string()),
-        download_path: Some(folder),
+        download_path: Some(file_path),
         created_at: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
     };
 
@@ -77,7 +96,7 @@ pub async fn start_playlist_download(
 }
 
 pub async fn start_stream_download(
-    State(config): State<Config>,
+    State(_): State<Config>,
     Json(payload): Json<StreamRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     if payload.url.trim().is_empty() {
@@ -86,19 +105,25 @@ pub async fn start_stream_download(
 
     let quality = payload.quality.unwrap_or_else(|| "best".to_string());
     let format = payload.format.unwrap_or_else(|| "mp4".to_string());
-    let folder = payload.folder.unwrap_or_else(|| config.download_dir.clone());
+    let current = settings::load();
+    let folder = payload.folder.unwrap_or_else(|| current.video_dir.clone());
 
     let service = DownloadService::new();
-    let title = service.start_stream_download(&payload.url, &quality, &format, &folder).await?;
+    let file_path = service.start_stream_download(&payload.url, &quality, &format, &folder).await?;
+
+    let file_name = std::path::Path::new(&file_path)
+        .file_name()
+        .map(|f| f.to_string_lossy().to_string())
+        .unwrap_or_else(|| file_path.clone());
 
     let item = DownloadItem {
         id: 0,
         url: payload.url,
-        title: Some(title),
+        title: Some(file_name),
         status: "completed".to_string(),
         progress: 100.0,
         download_type: Some("stream".to_string()),
-        download_path: Some(folder),
+        download_path: Some(file_path),
         created_at: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
     };
 
@@ -197,9 +222,20 @@ pub async fn list_files(
 ) -> Result<impl IntoResponse, AppError> {
     use std::fs;
 
+    let current = settings::load();
     let mut files: Vec<DiskFile> = Vec::new();
-    let mut dirs = vec![config.download_dir.clone(), config.music_dir.clone()];
-    dirs.dedup();
+    let allowed: Vec<String> = vec![
+        current.video_dir.clone(),
+        current.music_dir.clone(),
+        config.download_dir.clone(),
+        config.music_dir.clone(),
+    ];
+    let mut dirs: Vec<String> = Vec::new();
+    for d in allowed {
+        if !dirs.contains(&d) {
+            dirs.push(d);
+        }
+    }
 
     for dir in dirs {
         let Ok(entries) = fs::read_dir(&dir) else {
@@ -246,7 +282,7 @@ pub async fn list_files(
 }
 
 pub async fn delete_file(
-    State(config): State<Config>,
+    State(_): State<Config>,
     Json(payload): Json<serde_json::Value>,
 ) -> Result<impl IntoResponse, AppError> {
     let path = payload["path"].as_str().unwrap_or("");
@@ -255,8 +291,9 @@ pub async fn delete_file(
     }
 
     let target = std::path::Path::new(path);
-    let in_download = target.starts_with(&config.download_dir);
-    let in_music = target.starts_with(&config.music_dir);
+    let current = settings::load();
+    let in_download = target.starts_with(&current.video_dir);
+    let in_music = target.starts_with(&current.music_dir);
     if !in_download && !in_music {
         return Err(AppError::InvalidUrl);
     }

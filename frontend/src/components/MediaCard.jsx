@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function MediaCard({ item, onDelete, onAddToPlaylist }) {
+export default function MediaCard({ item, onDelete, onPlay, onAddToPlaylist }) {
   const formatDuration = (sec) => {
     if (!sec) return '';
     const m = Math.floor(sec / 60);
@@ -45,6 +45,7 @@ export default function MediaCard({ item, onDelete, onAddToPlaylist }) {
         <button
           className="action-btn play-action"
           title="Oynat"
+          onClick={() => onPlay && onPlay(item)}
         >
           ▶
         </button>

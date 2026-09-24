@@ -87,7 +87,7 @@ function createTray() {
     { label: 'Çıkış', click: () => app.quit() }
   ]);
 
-  tray.setToolTip('Video İndirici');
+  tray.setToolTip('Video_Indirici');
   tray.setContextMenu(contextMenu);
 
   tray.on('double-click', () => {
@@ -144,7 +144,7 @@ function showAbout() {
   dialog.showMessageBox(mainWindow, {
     type: 'info',
     title: 'Hakkında',
-    message: 'Video İndirici v1.0.0',
+    message: 'Video_Indirici v1.0.0',
     detail: 'Electron tabanlı video indirme uygulaması'
   });
 }
@@ -191,4 +191,10 @@ ipcMain.handle('open-external', async (event, url) => {
     return { success: true };
   }
   return { success: false };
+});
+
+ipcMain.handle('open-file', async (event, filePath) => {
+  if (!filePath || typeof filePath !== 'string') return { success: false, error: 'Yol yok' };
+  const error = await shell.openPath(filePath);
+  return error ? { success: false, error } : { success: true };
 });

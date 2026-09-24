@@ -175,16 +175,17 @@ impl DownloadService {
 
     pub async fn search(&self, query: &str, limit: usize) -> Result<Vec<serde_json::Value>, AppError> {
         let mut results = Vec::new();
-        let halved = (limit.max(2) / 2).max(2);
+        let main = limit.max(20);
+        let side = 10;
 
-        let sources: Vec<(&str, &str)> = vec![
-            ("ytsearch", "youtube"),
-            ("scsearch", "soundcloud"),
-            ("spsearch", "spotify"),
+        let sources: Vec<(&str, &str, usize)> = vec![
+            ("ytsearch", "youtube", main),
+            ("scsearch", "soundcloud", side),
+            ("spsearch", "spotify", side),
         ];
 
-        for (prefix, platform) in sources {
-            let search_query = format!("{}{}:{}", prefix, halved, query);
+        for (prefix, platform, count) in sources {
+            let search_query = format!("{}{}:{}", prefix, count, query);
             let output = Command::new(&self.ytdlp_path)
                 .args(&[
                     "--dump-json",
@@ -305,7 +306,7 @@ impl DownloadService {
                     let lines: Vec<&str> = stdout.lines().filter(|l| !l.trim().is_empty()).collect();
                     let last = lines.last().map(|s| s.trim().to_string());
 
-                    let title = last
+                    let file_path = last
                         .or_else(|| {
                             lines
                                 .iter()
@@ -313,15 +314,9 @@ impl DownloadService {
                                 .and_then(|l| l.split("Destination: ").nth(1))
                                 .map(|s| s.trim().to_string())
                         })
-                        .map(|s| {
-                            std::path::Path::new(&s)
-                                .file_name()
-                                .map(|f| f.to_string_lossy().to_string())
-                                .unwrap_or(s)
-                        })
                         .unwrap_or_else(|| "Bilinmeyen içerik".to_string());
 
-                    Ok(title)
+                    Ok(file_path)
                 } else {
                     let err_msg = String::from_utf8_lossy(&out.stderr).to_string();
                     Err(AppError::DownloadFailed(err_msg))
@@ -337,16 +332,18 @@ impl DownloadService {
             self.ffmpeg_dir.clone(),
             "--no-playlist".to_string(),
             "--no-overwrites".to_string(),
+            "--concurrent-fragments".to_string(),
+            "8".to_string(),
         ];
 
         let fmt_arg = match quality {
-            "1080" => "bestvideo[height<=1080]+bestaudio/best[height<=1080]",
-            "720" => "bestvideo[height<=720]+bestaudio/best[height<=720]",
-            "480" => "bestvideo[height<=480]+bestaudio/best[height<=480]",
+            "1080" => "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[height<=1080]",
+            "720" => "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best[height<=720]",
+            "480" => "bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=480]+bestaudio/best[height<=480]",
             _ => match format {
                 "mp3" | "flac" | "wav" | "aac" | "ogg" => "bestaudio/best",
                 "webm" => "bestvideo[ext=webm]+bestaudio/best",
-                _ => "bestvideo+bestaudio/best",
+                _ => "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
             },
         };
         args.push("-f".to_string());
@@ -357,6 +354,8 @@ impl DownloadService {
                 args.push("--extract-audio".to_string());
                 args.push("--audio-format".to_string());
                 args.push(format.to_string());
+                args.push("--audio-quality".to_string());
+                args.push("0".to_string());
                 args.push("--embed-thumbnail".to_string());
                 args.push("--add-metadata".to_string());
             }
@@ -364,7 +363,7 @@ impl DownloadService {
                 let out_fmt = if format.is_empty() { "mp4" } else { format };
                 args.push("--merge-output-format".to_string());
                 args.push(out_fmt.to_string());
-                args.push("--recode-video".to_string());
+                args.push("--remux-video".to_string());
                 args.push(out_fmt.to_string());
             }
         }
@@ -391,15 +390,17 @@ impl DownloadService {
             "--yes-playlist".to_string(),
             "--no-overwrites".to_string(),
             "--ignore-errors".to_string(),
+            "--concurrent-fragments".to_string(),
+            "8".to_string(),
         ];
 
         let fmt_arg = match quality {
-            "1080" => "bestvideo[height<=1080]+bestaudio/best[height<=1080]",
-            "720" => "bestvideo[height<=720]+bestaudio/best[height<=720]",
-            "480" => "bestvideo[height<=480]+bestaudio/best[height<=480]",
+            "1080" => "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[height<=1080]",
+            "720" => "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best[height<=720]",
+            "480" => "bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=480]+bestaudio/best[height<=480]",
             _ => match format {
                 "mp3" | "flac" | "wav" | "aac" | "ogg" => "bestaudio/best",
-                _ => "bestvideo+bestaudio/best",
+                _ => "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
             },
         };
         args.push("-f".to_string());
@@ -410,6 +411,8 @@ impl DownloadService {
                 args.push("--extract-audio".to_string());
                 args.push("--audio-format".to_string());
                 args.push(format.to_string());
+                args.push("--audio-quality".to_string());
+                args.push("0".to_string());
                 args.push("--embed-thumbnail".to_string());
                 args.push("--add-metadata".to_string());
                 args.push("--xattrs".to_string());
@@ -428,7 +431,7 @@ impl DownloadService {
             _ => {
                 args.push("--merge-output-format".to_string());
                 args.push(if format.is_empty() { "mp4" } else { format }.to_string());
-                args.push("--recode-video".to_string());
+                args.push("--remux-video".to_string());
                 args.push(if format.is_empty() { "mp4" } else { format }.to_string());
                 args.push("-o".to_string());
                 args.push(format!("{}/%(playlist_title)s/%(title)s.%(ext)s", folder));
@@ -456,12 +459,9 @@ impl DownloadService {
             "--no-playlist".to_string(),
             "--embed-thumbnail".to_string(),
             "--add-metadata".to_string(),
+            "--concurrent-fragments".to_string(),
+            "8".to_string(),
         ];
-
-        if platform == "twitch" {
-            args.push("--concurrent-fragments".to_string());
-            args.push("4".to_string());
-        }
 
         let fmt_arg = match quality {
             "1080" => "bestvideo[height<=1080]+bestaudio/best[height<=1080]",
@@ -478,12 +478,14 @@ impl DownloadService {
                 args.push("--extract-audio".to_string());
                 args.push("--audio-format".to_string());
                 args.push(format.to_string());
+                args.push("--audio-quality".to_string());
+                args.push("0".to_string());
             }
             _ => {
                 let out_fmt = if format.is_empty() { "mp4" } else { format };
                 args.push("--merge-output-format".to_string());
                 args.push(out_fmt.to_string());
-                args.push("--recode-video".to_string());
+                args.push("--remux-video".to_string());
                 args.push(out_fmt.to_string());
             }
         }

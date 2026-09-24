@@ -87,3 +87,17 @@ export async function deleteDiskFile(path) {
   });
   return handleResponse(response);
 }
+
+export async function getAppSettings() {
+  const response = await fetch(`${API_BASE}/settings`);
+  return handleResponse(response);
+}
+
+export async function updateAppSettings(settings) {
+  const response = await fetch(`${API_BASE}/settings`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings),
+  });
+  return handleResponse(response);
+}

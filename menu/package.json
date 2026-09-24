@@ -1,7 +1,7 @@
 {
   "name": "video-indirici",
   "version": "1.0.0",
-  "description": "Video İndirici - Tek Exe",
+  "description": "Video_Indirici - Tek Exe",
   "main": "src/main.js",
   "author": "ItzJPPPMe",
   "scripts": {
@@ -14,7 +14,7 @@
   },
   "build": {
     "appId": "com.ender.videoindirici",
-    "productName": "Video İndirici",
+    "productName": "Video_Indirici",
     "directories": {
       "output": "release"
     },
@@ -62,17 +62,17 @@
       ]
     },
     "nsis": {
-      "artifactName": "Video Indirici Setup.exe",
+      "artifactName": "Video_Indirici Setup.exe",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
     },
     "msi": {
-      "artifactName": "Video Indirici.msi"
+      "artifactName": "Video_Indirici.msi"
     },
     "portable": {
-      "artifactName": "Video Indirici.exe"
+      "artifactName": "Video_Indirici.exe"
     }
   },
   "devDependencies": {

@@ -1,11 +1,14 @@
 use std::env;
 
+use crate::settings;
+
 #[derive(Clone, Debug)]
 pub struct Config {
     pub port: u16,
     pub database_url: String,
     pub download_dir: String,
     pub music_dir: String,
+    pub theme: String,
 }
 
 fn app_data_dir() -> String {
@@ -22,16 +25,18 @@ fn app_data_dir() -> String {
 impl Config {
     pub fn from_env() -> Self {
         let data_dir = app_data_dir();
+        let current = settings::load();
 
-        let default_download_dir = "C:\\Video İndirici".to_string();
+        let default_download_dir = current.video_dir.clone();
         let _ = std::fs::create_dir_all(&default_download_dir);
+        let _ = std::fs::create_dir_all(&current.music_dir);
 
         let download_dir = env::var("DOWNLOAD_DIR").unwrap_or_else(|_| {
-            default_download_dir.clone()
+            current.video_dir.clone()
         });
 
         let music_dir = env::var("MUSIC_DIR").unwrap_or_else(|_| {
-            default_download_dir.clone()
+            current.music_dir.clone()
         });
 
         let database_url = env::var("DATABASE_URL").unwrap_or_else(|_| {
@@ -46,6 +51,7 @@ impl Config {
             database_url,
             download_dir,
             music_dir,
+            theme: current.theme,
         }
     }
 }

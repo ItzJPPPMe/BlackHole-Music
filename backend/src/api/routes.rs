@@ -3,7 +3,7 @@ use axum::{
     Router,
 };
 use tower_http::cors::CorsLayer;
-use crate::{config::Config, handlers::download_handler};
+use crate::{config::Config, handlers::{download_handler, settings_handler}};
 
 pub fn create_router(config: Config) -> Router {
     let cors = CorsLayer::permissive();
@@ -19,6 +19,10 @@ pub fn create_router(config: Config) -> Router {
         .route("/api/search", post(download_handler::search_music))
         .route("/api/files", get(download_handler::list_files))
         .route("/api/files/delete", post(download_handler::delete_file))
+        .route(
+            "/api/settings",
+            get(settings_handler::get_settings).put(settings_handler::update_settings),
+        )
         .layer(cors)
         .with_state(config)
 }

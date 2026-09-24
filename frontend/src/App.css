@@ -9,6 +9,7 @@
   --bg-secondary: #1e1e1e;
   --bg-card: #2a2a2a;
   --accent-blue: #2196F3;
+  --accent-dark: #1976D2;
   --accent-purple: #9C27B0;
   --accent-green: #4CAF50;
   --accent-orange: #FF9800;
@@ -16,6 +17,26 @@
   --text-primary: #ffffff;
   --text-secondary: #b3b3b3;
   --text-muted: #727272;
+}
+
+body[data-theme="purple"] {
+  --accent-blue: #9C27B0;
+  --accent-dark: #7B1FA2;
+}
+
+body[data-theme="green"] {
+  --accent-blue: #4CAF50;
+  --accent-dark: #388E3C;
+}
+
+body[data-theme="orange"] {
+  --accent-blue: #FF9800;
+  --accent-dark: #EF6C00;
+}
+
+body[data-theme="red"] {
+  --accent-blue: #f44336;
+  --accent-dark: #D32F2F;
 }
 
 body {
@@ -31,7 +52,7 @@ body {
 }
 
 .app-header {
-  background: linear-gradient(135deg, #1565C0, #1976D2);
+  background: linear-gradient(135deg, var(--accent-dark), var(--accent-blue));
   padding: 12px 16px;
   display: flex;
   align-items: center;
@@ -57,8 +78,12 @@ body {
 
 .header-right {
   flex: 1;
-  max-width: 300px;
+  max-width: 320px;
   margin-left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-end;
 }
 
 .search-bar {
@@ -205,7 +230,7 @@ body {
 }
 
 .add-first-btn:hover {
-  background: #1976D2;
+  background: var(--accent-dark);
 }
 
 .media-grid {
@@ -354,7 +379,7 @@ body {
 }
 
 .add-action:hover {
-  background: #1976D2;
+  background: var(--accent-dark);
 }
 
 .delete-btn {
@@ -400,7 +425,7 @@ body {
 }
 
 .fab:hover {
-  background: #1976D2;
+  background: var(--accent-dark);
   transform: scale(1.1);
 }
 
@@ -547,13 +572,53 @@ body {
 }
 
 .myt-search-btn:hover {
-  background: #1976D2;
+  background: var(--accent-dark);
   transform: scale(1.05);
 }
 
 .myt-search-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.myt-urlbar {
+  margin-bottom: 12px;
+}
+
+.urlbar-hint {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.urlbar-row {
+  display: flex;
+  gap: 8px;
+}
+
+.urlbar-row .myt-search-input {
+  flex: 1;
+}
+
+.myt-url-btn {
+  padding: 0 18px;
+  border: none;
+  border-radius: 24px;
+  background: linear-gradient(135deg, var(--accent-green), #2E7D32);
+  color: white;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.myt-url-btn:hover {
+  transform: scale(1.03);
+  filter: brightness(1.1);
 }
 
 .myt-platforms {
@@ -868,7 +933,7 @@ body {
 }
 
 .result-btn.pl-btn:hover {
-  background: #1976D2;
+  background: var(--accent-dark);
 }
 
 /* Shared buttons */
@@ -886,7 +951,7 @@ body {
 }
 
 .add-btn:hover {
-  background: #1976D2;
+  background: var(--accent-dark);
   transform: scale(1.03);
 }
 
@@ -960,7 +1025,7 @@ body {
   width: 46px;
   height: 46px;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--accent-blue), #0D47A1);
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-dark));
   color: white;
   font-size: 1.2rem;
   display: flex;
@@ -1148,4 +1213,87 @@ body {
   padding: 2px 8px;
   border-radius: 10px;
   flex-shrink: 0;
+}
+
+.settings-btn {
+  background: rgba(255,255,255,0.15);
+  border: none;
+  color: white;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  font-size: 1.1rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.settings-btn:hover {
+  background: rgba(255,255,255,0.3);
+  transform: rotate(20deg);
+}
+
+.settings-label {
+  display: block;
+  margin-top: 12px;
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.theme-grid {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.theme-swatch {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  color: white;
+  font-size: 0.8rem;
+  font-weight: bold;
+  transition: transform 0.15s, border-color 0.15s;
+}
+
+.theme-swatch:hover {
+  transform: scale(1.15);
+}
+
+.theme-swatch.active {
+  border-color: white;
+  box-shadow: 0 0 0 2px var(--accent-dark);
+}
+
+.folder-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.folder-input {
+  flex: 1;
+}
+
+.folder-select-btn {
+  background: var(--accent-blue);
+  border: none;
+  color: white;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  transition: opacity 0.2s;
+}
+
+.folder-select-btn:hover {
+  opacity: 0.85;
 }

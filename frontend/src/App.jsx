@@ -2,11 +2,21 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import MediaCard from './components/MediaCard';
 import SearchBar from './components/SearchBar';
 import SearchResultCard from './components/SearchResultCard';
-import { requestDownload, searchMusic, getPlaylistInfo, getDiskFiles, deleteDiskFile } from './services/api';
+import { requestDownload, searchMusic, getPlaylistInfo, getDiskFiles, deleteDiskFile, getAppSettings, updateAppSettings } from './services/api';
 import './App.css';
 
 const STORAGE_KEY = 'ender_downloader_media';
 const PLAYLISTS_KEY = 'blackhole_music_playlists';
+const SETTINGS_KEY = 'blackhole_music_settings';
+const THEME_KEY = 'blackhole_music_theme';
+
+const THEMES = [
+  { id: 'blue', label: 'Mavi', color: '#2196F3' },
+  { id: 'purple', label: 'Mor', color: '#9C27B0' },
+  { id: 'green', label: 'Yeşil', color: '#4CAF50' },
+  { id: 'orange', label: 'Turuncu', color: '#FF9800' },
+  { id: 'red', label: 'Kırmızı', color: '#f44336' },
+];
 
 function loadMedia() {
   try {
@@ -58,6 +68,20 @@ export default function App() {
   const [playlistUrl, setPlaylistUrl] = useState('');
   const [playlistBusy, setPlaylistBusy] = useState(false);
   const [pickerTarget, setPickerTarget] = useState(null);
+  const [showUrlModal, setShowUrlModal] = useState(false);
+  const [urlModalValue, setUrlModalValue] = useState('');
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [appSettings, setAppSettings] = useState(() => {
+    try {
+      const data = localStorage.getItem(SETTINGS_KEY);
+      return data ? JSON.parse(data) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [settingsTheme, setSettingsTheme] = useState(() => {
+    return localStorage.getItem(THEME_KEY) || 'blue';
+  });
 
   useEffect(() => {
     saveMedia(media);
@@ -66,6 +90,29 @@ export default function App() {
   useEffect(() => {
     savePlaylists(playlists);
   }, [playlists]);
+
+  useEffect(() => {
+    document.body.setAttribute('data-theme', settingsTheme);
+    localStorage.setItem(THEME_KEY, settingsTheme);
+  }, [settingsTheme]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getAppSettings()
+      .then(res => {
+        if (cancelled || !res?.data) return;
+        setAppSettings(prev => {
+          const merged = { ...(prev || {}), ...res.data };
+          localStorage.setItem(SETTINGS_KEY, JSON.stringify(merged));
+          return merged;
+        });
+        if (res.data.theme) {
+          setSettingsTheme(res.data.theme);
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -95,7 +142,7 @@ export default function App() {
     setSearching(true);
     setStatus({ type: 'info', message: 'Aranıyor...' });
     try {
-      const res = await searchMusic(q, 15);
+      const res = await searchMusic(q, 100);
       setSearchResults(res.data || []);
       setStatus(null);
     } catch (err) {
@@ -184,7 +231,8 @@ export default function App() {
     setStatus({ type: 'info', message: `${type === 'music' ? 'Müzik' : 'Video'} indiriliyor...` });
 
     try {
-      const res = await requestDownload(url, 'best', format || (type === 'music' ? 'mp3' : 'mp4'), null, type);
+      const targetFolder = appSettings?.[type === 'music' ? 'music_dir' : 'video_dir'] || null;
+      const res = await requestDownload(url, 'best', format || (type === 'music' ? 'mp3' : 'mp4'), targetFolder, type);
       setMedia(prev => prev.map(item => item.id === id
         ? {
           ...item,
@@ -192,6 +240,7 @@ export default function App() {
           title: res.data?.title || item.title,
           artist: res.data?.title?.split(' - ')[0] || item.artist,
           format: res.data?.title?.split('.').pop()?.toLowerCase() || item.format,
+          path: res.data?.download_path || item.path || '',
         }
         : item
       ));
@@ -220,13 +269,44 @@ export default function App() {
     const record = media.find(m => m.id === id);
     setMedia(prev => prev.filter(item => item.id !== id));
 
-    if (record && record.title) {
+    let targetPath = record?.path || '';
+    if (!targetPath && record?.title) {
       const diskItem = diskFiles.find(f => (f.name || '').trim() === (record.title || '').trim());
-      if (diskItem) {
-        deleteDiskFile(diskItem.path)
-          .then(() => setDiskFiles(prev => prev.filter(f => f.path !== diskItem.path)))
-          .catch(() => {});
-      }
+      if (diskItem) targetPath = diskItem.path;
+    }
+
+    if (targetPath) {
+      deleteDiskFile(targetPath)
+        .then(() => {
+          setDiskFiles(prev => prev.filter(f => f.path !== targetPath));
+          setStatus({ type: 'success', message: 'Dosya ve kayıt silindi' });
+        })
+        .catch(() => {});
+    }
+  };
+
+  const handlePlay = (item) => {
+    let filePath = item?.path || '';
+    if (!filePath && item?.title) {
+      const diskItem = diskFiles.find(f => (f.name || '').trim() === (item.title || '').trim());
+      if (diskItem) filePath = diskItem.path;
+    }
+
+    if (!filePath) {
+      setStatus({ type: 'error', message: 'Dosya yolu bulunamadı' });
+      return;
+    }
+
+    if (window.electronAPI?.openFile) {
+      window.electronAPI.openFile(filePath)
+        .then(res => {
+          if (!res?.success) {
+            setStatus({ type: 'error', message: 'Oynatılamadı: ' + (res?.error || '') });
+          }
+        })
+        .catch(err => setStatus({ type: 'error', message: 'Oynatma hatası: ' + err.message }));
+    } else {
+      window.open('file:///' + filePath.split('\\').join('/'), '_self');
     }
   };
 
@@ -460,6 +540,7 @@ export default function App() {
             key={item.id}
             item={item}
             onDelete={handleDeleteMedia}
+            onPlay={handlePlay}
             onAddToPlaylist={(track) => setPickerTarget(track)}
           />
         ))}
@@ -475,6 +556,11 @@ export default function App() {
         </div>
         <div className="header-right">
           <SearchBar value={searchQuery} onChange={setSearchQuery} />
+          <button
+            className="settings-btn"
+            onClick={() => setShowSettingsModal(true)}
+            title="Ayarlar"
+          >⚙</button>
         </div>
       </header>
 
@@ -515,6 +601,26 @@ export default function App() {
               >
                 {searching ? '⏳' : '🔍'}
               </button>
+            </div>
+
+            <div className="myt-urlbar">
+              <span className="urlbar-hint">Herhangi bir linki direkt indir:</span>
+              <div className="urlbar-row">
+                <input
+                  type="text"
+                  placeholder="https://youtube.com/watch?v=... veya herhangi bir sayfa"
+                  value={urlModalValue}
+                  onChange={(e) => setUrlModalValue(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { setShowUrlModal(true); } }}
+                  className="myt-search-input"
+                />
+                <button
+                  className="myt-url-btn"
+                  onClick={() => setShowUrlModal(true)}
+                >
+                  URL ile İndir
+                </button>
+              </div>
             </div>
 
             <div className="myt-platforms">
@@ -645,6 +751,44 @@ export default function App() {
         </div>
       )}
 
+      {showUrlModal && (
+        <div className="modal-overlay" onClick={() => setShowUrlModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h3>URL ile İndir</h3>
+            <input
+              type="text"
+              placeholder="YouTube, Spotify, SoundCloud veya herhangi bir video/müzik linki"
+              value={urlModalValue}
+              onChange={(e) => setUrlModalValue(e.target.value)}
+              className="modal-input"
+              autoFocus
+              onKeyDown={(e) => { if (e.key === 'Enter' && urlModalValue.trim()) { setShowUrlModal(false); handleDownload(urlModalValue.trim(), 'music', 'mp3'); setUrlModalValue(''); } }}
+            />
+            <div className="modal-buttons">
+              <button
+                className="modal-btn music-btn"
+                onClick={() => {
+                  const u = urlModalValue.trim();
+                  setShowUrlModal(false);
+                  setUrlModalValue('');
+                  handleDownload(u, 'music', 'mp3');
+                }}
+              >♫ Müzik indir</button>
+              <button
+                className="modal-btn video-btn"
+                onClick={() => {
+                  const u = urlModalValue.trim();
+                  setShowUrlModal(false);
+                  setUrlModalValue('');
+                  handleDownload(u, 'video', 'mp4');
+                }}
+              >▶ Video indir</button>
+              <button className="modal-btn cancel-btn" onClick={() => setShowUrlModal(false)}>İptal</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {pickerTarget && (
         <div className="modal-overlay" onClick={() => setPickerTarget(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
@@ -664,6 +808,77 @@ export default function App() {
             )}
             <div className="modal-buttons">
               <button className="modal-btn cancel-btn" onClick={() => setPickerTarget(null)}>İptal</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSettingsModal && (
+        <div className="modal-overlay" onClick={() => setShowSettingsModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h3>Ayarlar</h3>
+            <label className="settings-label">Uygulama Rengi</label>
+            <div className="theme-grid">
+              {THEMES.map(t => (
+                <button
+                  key={t.id}
+                  className={`theme-swatch ${settingsTheme === t.id ? 'active' : ''}`}
+                  style={{ background: t.color }}
+                  onClick={() => setSettingsTheme(t.id)}
+                  title={t.label}
+                >
+                  {settingsTheme === t.id ? '✓' : ''}
+                </button>
+              ))}
+            </div>
+            <label className="settings-label">Video Klasörü</label>
+            <div className="folder-row">
+              <input
+                type="text"
+                className="modal-input folder-input"
+                value={appSettings?.video_dir || ''}
+                placeholder="Video dosyalarının kaydedileceği klasör"
+                onChange={(e) => setAppSettings(prev => ({ ...(prev || {}), video_dir: e.target.value }))}
+              />
+              <button className="folder-select-btn" onClick={async () => {
+                if (!window.electronAPI?.selectFolder) return;
+                const dir = await window.electronAPI.selectFolder();
+                if (dir) setAppSettings(prev => ({ ...(prev || {}), video_dir: dir }));
+              }}>Gözat</button>
+            </div>
+            <label className="settings-label">Müzik Klasörü</label>
+            <div className="folder-row">
+              <input
+                type="text"
+                className="modal-input folder-input"
+                value={appSettings?.music_dir || ''}
+                placeholder="Müzik dosyalarının kaydedileceği klasör"
+                onChange={(e) => setAppSettings(prev => ({ ...(prev || {}), music_dir: e.target.value }))}
+              />
+              <button className="folder-select-btn" onClick={async () => {
+                if (!window.electronAPI?.selectFolder) return;
+                const dir = await window.electronAPI.selectFolder();
+                if (dir) setAppSettings(prev => ({ ...(prev || {}), music_dir: dir }));
+              }}>Gözat</button>
+            </div>
+            <div className="modal-buttons">
+              <button className="modal-btn save-btn" onClick={async () => {
+                try {
+                  const payload = {
+                    video_dir: appSettings?.video_dir || 'C:\\Video_Indirici',
+                    music_dir: appSettings?.music_dir || 'C:\\Video_Indirici',
+                    theme: settingsTheme,
+                  };
+                  await updateAppSettings(payload);
+                  setAppSettings(payload);
+                  localStorage.setItem(SETTINGS_KEY, JSON.stringify(payload));
+                  setStatus({ type: 'success', message: 'Ayarlar kaydedildi' });
+                } catch (err) {
+                  setStatus({ type: 'error', message: 'Ayarlar kaydedilemedi: ' + err.message });
+                }
+                setShowSettingsModal(false);
+              }}>Kaydet</button>
+              <button className="modal-btn cancel-btn" onClick={() => setShowSettingsModal(false)}>İptal</button>
             </div>
           </div>
         </div>
