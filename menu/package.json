@@ -1,0 +1,82 @@
+{
+  "name": "video-indirici",
+  "version": "1.0.0",
+  "description": "Video İndirici - Tek Exe",
+  "main": "src/main.js",
+  "author": "ItzJPPPMe",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder --win",
+    "build:setup": "electron-builder --win nsis",
+    "build:msi": "electron-builder --win msi",
+    "build:portable": "electron-builder --win portable"
+  },
+  "build": {
+    "appId": "com.ender.videoindirici",
+    "productName": "Video İndirici",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/backend",
+        "to": "resources/backend",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "resources/compiler",
+        "to": "resources/compiler",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "resources/scripts",
+        "to": "resources/scripts",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "resources/frontend",
+        "to": "resources/frontend",
+        "filter": ["**/*"]
+      }
+    ],
+    "win": {
+      "icon": "assets/icons/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "msi",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "artifactName": "Video Indirici Setup.exe",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "msi": {
+      "artifactName": "Video Indirici.msi"
+    },
+    "portable": {
+      "artifactName": "Video Indirici.exe"
+    }
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^26.15.3"
+  }
+}

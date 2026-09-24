@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' https://img.youtube.com *;">
+  <title>BlackHole Music</title>
+  <link rel="stylesheet" href="../assets/styles/main.css">
+</head>
+<body>
+  <div id="app">
+    <header id="titlebar">
+      <div class="titlebar-drag">
+        <span class="app-logo">BlackHole Music</span>
+      </div>
+      <div class="header-actions">
+        <input type="text" id="search-input" placeholder="Ara..." class="search-input">
+        <button id="btn-minimize" class="ctrl-btn" title="Küçült">
+          <svg width="12" height="12" viewBox="0 0 12 12"><rect y="5" width="12" height="1" fill="currentColor"/></svg>
+        </button>
+        <button id="btn-maximize" class="ctrl-btn" title="Büyüt">
+          <svg width="12" height="12" viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" stroke="currentColor" stroke-width="1" fill="none"/></svg>
+        </button>
+        <button id="btn-close" class="ctrl-btn ctrl-close" title="Kapat">
+          <svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 1L11 11M1 11L11 1" stroke="currentColor" stroke-width="1.5"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <nav id="tab-bar">
+      <button class="tab-btn active" data-tab="videos">VİDEOLARIM</button>
+      <button class="tab-btn" data-tab="myt">ARAMA</button>
+      <button class="tab-btn" data-tab="music">MÜZİKLERİM</button>
+      <button class="tab-btn" data-tab="playlists">LİSTELERİM</button>
+    </nav>
+
+    <main id="content">
+      <div id="media-list"></div>
+
+      <div id="empty-state" class="empty-state">
+        <div class="empty-icon">♫</div>
+        <p>Henüz içerik eklenmedi</p>
+        <button id="btn-add-first" class="add-btn">+ İlk İçeriği Ekle</button>
+      </div>
+    </main>
+
+    <button id="fab-add" class="fab">+</button>
+
+    <div id="status-bar">
+      <span id="status-text">Hazır</span>
+    </div>
+  </div>
+
+  <div id="add-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <h3>İçerik Ekle</h3>
+      <input type="text" id="modal-title" placeholder="Başlık" class="modal-input">
+      <input type="text" id="modal-url" placeholder="Video/Müzik URL'si" class="modal-input">
+      <select id="modal-type" class="modal-input">
+        <option value="video">Video</option>
+        <option value="music">Müzik</option>
+      </select>
+      <div class="modal-buttons">
+        <button id="modal-save" class="modal-btn save-btn">Ekle</button>
+        <button id="modal-cancel" class="modal-btn cancel-btn">İptal</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
