@@ -27,6 +27,7 @@ YouTube, Instagram, TikTok ve daha birçok platformdan video ve müzik indirmeni
 
 Bu program **ItzJPPPMe** tarafından kodlanmıştır fakat bazı bölümlerinde yapay zeka yardımı alınmıştır:
 
+Bu programın ismini değiştirip paylaşırsanız yani programı çalarsanız sizleri ilk başta uyarırım sonra telif atarım veya bunu kaldırttırırım lütfen çalmayın
 
 İndirdiğiniz içerik telif haklarına tabi olabilir; yalnızca indirme hakkına sahip olduğunuz içerikleri kullanın.
 
