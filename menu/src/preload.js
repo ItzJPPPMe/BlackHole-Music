@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   startDownload: (data) => ipcRenderer.invoke('start-download', data),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
   openFile: (filePath) => ipcRenderer.invoke('open-file', filePath),
+  showInFolder: (filePath) => ipcRenderer.invoke('show-in-folder', filePath),
 
   onAction: (callback) => {
     ipcRenderer.on('new-download', () => callback('new-download'));

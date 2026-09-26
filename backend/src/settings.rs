@@ -2,11 +2,20 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use std::path::Path;
 
+fn default_quality() -> String {
+    "best".to_string()
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Settings {
+    #[serde(default)]
     pub video_dir: String,
+    #[serde(default)]
     pub music_dir: String,
+    #[serde(default)]
     pub theme: String,
+    #[serde(default = "default_quality")]
+    pub video_quality: String,
 }
 
 impl Default for Settings {
@@ -15,6 +24,7 @@ impl Default for Settings {
             video_dir: "C:\\Video_Indirici".to_string(),
             music_dir: "C:\\Video_Indirici".to_string(),
             theme: "blue".to_string(),
+            video_quality: "best".to_string(),
         }
     }
 }

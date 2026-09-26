@@ -923,6 +923,15 @@ body {
   transform: none;
 }
 
+.folder-action {
+  background: #37474f;
+  color: white;
+}
+
+.folder-action:hover {
+  background: #455a64;
+}
+
 .result-btn.pl-btn {
   width: auto;
   padding: 0 10px;
@@ -1144,6 +1153,23 @@ body {
   font-size: 0.75rem;
   color: var(--text-secondary);
   flex-shrink: 0;
+}
+
+.download-all-btn {
+  padding: 7px 14px;
+  background: var(--accent-blue);
+  border: none;
+  border-radius: 16px;
+  color: white;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.download-all-btn:hover {
+  background: var(--accent-dark);
 }
 
 .pl-empty-tracks {

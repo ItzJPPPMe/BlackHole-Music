@@ -79,6 +79,11 @@ export async function getDiskFiles() {
   return handleResponse(response);
 }
 
+export async function getDownloadProgress() {
+  const response = await fetch(`${API_BASE}/downloads/progress`);
+  return handleResponse(response);
+}
+
 export async function deleteDiskFile(path) {
   const response = await fetch(`${API_BASE}/files/delete`, {
     method: 'POST',

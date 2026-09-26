@@ -198,3 +198,10 @@ ipcMain.handle('open-file', async (event, filePath) => {
   const error = await shell.openPath(filePath);
   return error ? { success: false, error } : { success: true };
 });
+
+ipcMain.handle('show-in-folder', async (event, filePath) => {
+  if (!filePath || typeof filePath !== 'string') return { success: false, error: 'Yol yok' };
+  if (!fs.existsSync(filePath)) return { success: false, error: 'Dosya bulunamadı' };
+  shell.showItemInFolder(filePath);
+  return { success: true };
+});

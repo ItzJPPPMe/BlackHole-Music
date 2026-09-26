@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function MediaCard({ item, onDelete, onPlay, onAddToPlaylist }) {
+export default function MediaCard({ item, onDelete, onPlay, onAddToPlaylist, onOpenFolder }) {
   const formatDuration = (sec) => {
     if (!sec) return '';
     const m = Math.floor(sec / 60);
@@ -28,7 +28,10 @@ export default function MediaCard({ item, onDelete, onPlay, onAddToPlaylist }) {
         )}
         <div className="media-type-badge">{item.type === 'music' ? 'MP3' : 'MP4'}</div>
         {item.status === 'downloading' && (
-          <div className="status-overlay downloading"><span className="spinner"></span>İndiriliyor...</div>
+          <div className="status-overlay downloading">
+            <span className="spinner"></span>
+            {item.progress != null ? `İndiriliyor... %${Math.round(item.progress)}` : 'İndiriliyor...'}
+          </div>
         )}
         {item.status === 'error' && (
           <div className="status-overlay error"><span>✕</span>Hata</div>
@@ -49,6 +52,15 @@ export default function MediaCard({ item, onDelete, onPlay, onAddToPlaylist }) {
         >
           ▶
         </button>
+        {item.status === 'completed' && item.path && onOpenFolder && (
+          <button
+            className="action-btn folder-action"
+            title="Klasörde göster"
+            onClick={() => onOpenFolder && onOpenFolder(item)}
+          >
+            ⇓
+          </button>
+        )}
         {onAddToPlaylist && (
           <button
             className="action-btn add-action"

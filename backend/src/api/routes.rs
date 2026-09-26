@@ -12,6 +12,7 @@ pub fn create_router(config: Config) -> Router {
         .route("/api/download", post(download_handler::start_download))
         .route("/api/downloads", get(download_handler::get_downloads))
         .route("/api/downloads/:id", get(download_handler::get_download_by_id))
+        .route("/api/downloads/progress", get(download_handler::get_download_progress))
         .route("/api/playlist/info", post(download_handler::get_playlist_info))
         .route("/api/playlist/download", post(download_handler::start_playlist_download))
         .route("/api/stream/info", post(download_handler::get_stream_info))

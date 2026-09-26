@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import MediaCard from './components/MediaCard';
 import SearchBar from './components/SearchBar';
 import SearchResultCard from './components/SearchResultCard';
-import { requestDownload, searchMusic, getPlaylistInfo, getDiskFiles, deleteDiskFile, getAppSettings, updateAppSettings } from './services/api';
+import { requestDownload, searchMusic, getPlaylistInfo, getDiskFiles, deleteDiskFile, getAppSettings, updateAppSettings, getDownloadProgress } from './services/api';
 import './App.css';
 
 const STORAGE_KEY = 'ender_downloader_media';
@@ -47,6 +47,13 @@ function savePlaylists(playlists) {
 function thumbnailFromUrl(url) {
   const match = url.match(/(?:v=|\/)([\w-]{11})/);
   return match ? `https://img.youtube.com/vi/${match[1]}/mqdefault.jpg` : '';
+}
+
+function normalizeName(name) {
+  return (name || '')
+    .replace(/[\uFF01-\uFF5E]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
+    .trim()
+    .toLowerCase();
 }
 
 export default function App() {
@@ -179,9 +186,9 @@ export default function App() {
   });
 
   const allMedia = useMemo(() => {
-    const existingTitles = new Set(media.map(m => (m.title || '').trim()));
+    const existingTitles = new Set(media.map(m => normalizeName(m.title)));
     const diskItems = (diskFiles || [])
-      .filter(f => !existingTitles.has((f.name || '').trim()))
+      .filter(f => !existingTitles.has(normalizeName(f.name)))
       .map(f => ({
         id: 'disk-' + f.path,
         url: '',
@@ -225,18 +232,32 @@ export default function App() {
       thumbnail: thumbnailFromUrl(url),
       date: new Date().toISOString(),
       status: 'downloading',
+      progress: 0,
     };
     setMedia(prev => [newItem, ...prev]);
     setLoading(true);
     setStatus({ type: 'info', message: `${type === 'music' ? 'Müzik' : 'Video'} indiriliyor...` });
 
+    const progressTimer = setInterval(async () => {
+      try {
+        const res = await getDownloadProgress();
+        const pct = res?.data?.progress;
+        if (pct != null) {
+          setMedia(prev => prev.map(it => it.id === id ? { ...it, progress: Math.round(pct) } : it));
+        }
+      } catch { }
+    }, 700);
+
     try {
       const targetFolder = appSettings?.[type === 'music' ? 'music_dir' : 'video_dir'] || null;
-      const res = await requestDownload(url, 'best', format || (type === 'music' ? 'mp3' : 'mp4'), targetFolder, type);
+      const quality = type === 'video' ? (appSettings?.video_quality || 'best') : 'best';
+      const res = await requestDownload(url, quality, format || (type === 'music' ? 'mp3' : 'mp4'), targetFolder, type);
+      clearInterval(progressTimer);
       setMedia(prev => prev.map(item => item.id === id
         ? {
           ...item,
           status: 'completed',
+          progress: 100,
           title: res.data?.title || item.title,
           artist: res.data?.title?.split(' - ')[0] || item.artist,
           format: res.data?.title?.split('.').pop()?.toLowerCase() || item.format,
@@ -246,7 +267,8 @@ export default function App() {
       ));
       setStatus({ type: 'success', message: `${type === 'music' ? 'Müzik' : 'Video'} indirildi!` });
     } catch (err) {
-      setMedia(prev => prev.map(item => item.id === id ? { ...item, status: 'error' } : item));
+      clearInterval(progressTimer);
+      setMedia(prev => prev.map(item => item.id === id ? { ...item, status: 'error', progress: 0 } : item));
       setStatus({ type: 'error', message: err.message });
     } finally {
       setLoading(false);
@@ -271,7 +293,7 @@ export default function App() {
 
     let targetPath = record?.path || '';
     if (!targetPath && record?.title) {
-      const diskItem = diskFiles.find(f => (f.name || '').trim() === (record.title || '').trim());
+      const diskItem = diskFiles.find(f => normalizeName(f.name) === normalizeName(record.title));
       if (diskItem) targetPath = diskItem.path;
     }
 
@@ -288,7 +310,7 @@ export default function App() {
   const handlePlay = (item) => {
     let filePath = item?.path || '';
     if (!filePath && item?.title) {
-      const diskItem = diskFiles.find(f => (f.name || '').trim() === (item.title || '').trim());
+      const diskItem = diskFiles.find(f => normalizeName(f.name) === normalizeName(item.title));
       if (diskItem) filePath = diskItem.path;
     }
 
@@ -308,6 +330,17 @@ export default function App() {
     } else {
       window.open('file:///' + filePath.split('\\').join('/'), '_self');
     }
+  };
+
+  const handleShowInFolder = (item) => {
+    if (!window.electronAPI?.showInFolder || !item?.path) return;
+    window.electronAPI.showInFolder(item.path)
+      .then(res => {
+        if (!res?.success) {
+          setStatus({ type: 'error', message: 'Klasör açılamadı: ' + (res?.error || '') });
+        }
+      })
+      .catch(err => setStatus({ type: 'error', message: 'Klasör hatası: ' + err.message }));
   };
 
   const handleAddManual = (title, url, type) => {
@@ -418,6 +451,20 @@ export default function App() {
 
   const activePlaylist = playlists.find(p => p.id === activePlaylistId);
 
+  const downloadAllTracks = async () => {
+    if (!activePlaylist) return;
+    const tracks = activePlaylist.tracks || [];
+    if (tracks.length === 0) {
+      setStatus({ type: 'error', message: 'Listede parça yok' });
+      return;
+    }
+    setStatus({ type: 'info', message: `${tracks.length} parça indiriliyor...` });
+    for (const track of tracks) {
+      if (!track?.url) continue;
+      await handleDownload(track.url, 'music', 'mp3');
+    }
+  };
+
   const renderPlaylistSection = () => {
     if (playlists.length === 0) {
       return (
@@ -444,6 +491,11 @@ export default function App() {
               </span>
             </div>
             <span className="detail-count">{activePlaylist.tracks.length} parça</span>
+            {activePlaylist.tracks.length > 0 && (
+              <button className="download-all-btn" onClick={downloadAllTracks} title="Listedeki tüm parçaları MP3 olarak indir">
+                Tümünü İndir
+              </button>
+            )}
           </div>
 
           {activePlaylist.tracks.length === 0 ? (
@@ -541,6 +593,7 @@ export default function App() {
             item={item}
             onDelete={handleDeleteMedia}
             onPlay={handlePlay}
+            onOpenFolder={handleShowInFolder}
             onAddToPlaylist={(track) => setPickerTarget(track)}
           />
         ))}
@@ -831,6 +884,17 @@ export default function App() {
                 </button>
               ))}
             </div>
+            <label className="settings-label">Video Kalitesi</label>
+            <select
+              className="modal-input"
+              value={appSettings?.video_quality || 'best'}
+              onChange={(e) => setAppSettings(prev => ({ ...(prev || {}), video_quality: e.target.value }))}
+            >
+              <option value="best">En iyi kalite</option>
+              <option value="1080">1080p</option>
+              <option value="720">720p</option>
+              <option value="480">480p</option>
+            </select>
             <label className="settings-label">Video Klasörü</label>
             <div className="folder-row">
               <input
@@ -868,6 +932,7 @@ export default function App() {
                     video_dir: appSettings?.video_dir || 'C:\\Video_Indirici',
                     music_dir: appSettings?.music_dir || 'C:\\Video_Indirici',
                     theme: settingsTheme,
+                    video_quality: appSettings?.video_quality || 'best',
                   };
                   await updateAppSettings(payload);
                   setAppSettings(payload);

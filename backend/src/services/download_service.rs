@@ -1,5 +1,31 @@
 use crate::errors::AppError;
+use std::process::Stdio;
+use std::sync::{Mutex, OnceLock};
+use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
+
+static PROGRESS: OnceLock<Mutex<f32>> = OnceLock::new();
+
+fn progress_store() -> &'static Mutex<f32> {
+    PROGRESS.get_or_init(|| Mutex::new(0.0))
+}
+
+pub fn set_progress(v: f32) {
+    if let Ok(mut guard) = progress_store().lock() {
+        *guard = v.clamp(0.0, 100.0);
+    }
+}
+
+pub fn get_progress() -> f32 {
+    progress_store().lock().map(|g| *g).unwrap_or(0.0)
+}
+
+fn parse_progress(line: &str) -> Option<f32> {
+    let rest = line.split("% of").next()?;
+    let binding = rest.rsplit(']').next()?.replace('%', "");
+    let pct = binding.trim();
+    pct.parse::<f32>().ok()
+}
 
 fn find_ytdlp() -> String {
     let exe_dir = std::env::current_exe()
@@ -294,35 +320,86 @@ impl DownloadService {
     }
 
     async fn run_ytdlp(&self, args: Vec<String>) -> Result<String, AppError> {
-        let output = Command::new(&self.ytdlp_path)
+        set_progress(0.0);
+
+        let mut child = Command::new(&self.ytdlp_path)
             .args(&args)
-            .output()
-            .await;
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| AppError::DownloadFailed(format!("yt-dlp başlatılamadı: {}", e)))?;
 
-        match output {
-            Ok(out) => {
-                if out.status.success() {
-                    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
-                    let lines: Vec<&str> = stdout.lines().filter(|l| !l.trim().is_empty()).collect();
-                    let last = lines.last().map(|s| s.trim().to_string());
+        let stdout = child.stdout.take().ok_or_else(|| {
+            AppError::DownloadFailed("yt-dlp stdout alınamadı".to_string())
+        })?;
+        let stderr = child.stderr.take().ok_or_else(|| {
+            AppError::DownloadFailed("yt-dlp stderr alınamadı".to_string())
+        })?;
+        let mut stdout_reader = BufReader::new(stdout).lines();
+        let mut stderr_reader = BufReader::new(stderr).lines();
 
-                    let file_path = last
-                        .or_else(|| {
-                            lines
-                                .iter()
-                                .find(|l| l.contains("[download] Destination:"))
-                                .and_then(|l| l.split("Destination: ").nth(1))
-                                .map(|s| s.trim().to_string())
-                        })
-                        .unwrap_or_else(|| "Bilinmeyen içerik".to_string());
+        let mut last = String::new();
+        let mut err_lines: Vec<String> = Vec::new();
+        let mut stdout_done = false;
+        let mut stderr_done = false;
 
-                    Ok(file_path)
-                } else {
-                    let err_msg = String::from_utf8_lossy(&out.stderr).to_string();
-                    Err(AppError::DownloadFailed(err_msg))
+        while !(stdout_done && stderr_done) {
+            tokio::select! {
+                line = stdout_reader.next_line(), if !stdout_done => {
+                    match line {
+                        Ok(Some(l)) => {
+                            if let Some(pct) = parse_progress(&l) {
+                                set_progress(pct);
+                            }
+                            let t = l.trim().to_string();
+                            if !t.is_empty() {
+                                last = t.clone();
+                            }
+                        }
+                        _ => stdout_done = true,
+                    }
+                }
+                line = stderr_reader.next_line(), if !stderr_done => {
+                    match line {
+                        Ok(Some(l)) => {
+                            let t = l.trim().to_string();
+                            if !t.is_empty() {
+                                err_lines.push(t);
+                            }
+                        }
+                        _ => stderr_done = true,
+                    }
                 }
             }
-            Err(e) => Err(AppError::DownloadFailed(e.to_string())),
+        }
+
+        let status = child
+            .wait()
+            .await
+            .map_err(|e| AppError::DownloadFailed(e.to_string()))?;
+
+        if status.success() {
+            set_progress(100.0);
+
+            let file_path = if last.trim().is_empty() {
+                err_lines
+                    .iter()
+                    .find(|l| l.contains("[download] Destination:"))
+                    .and_then(|l| l.split("Destination: ").nth(1))
+                    .map(|s| s.trim().to_string())
+                    .unwrap_or_else(|| "Bilinmeyen içerik".to_string())
+            } else {
+                last
+            };
+
+            Ok(file_path)
+        } else {
+            let err_msg = err_lines.join("\n");
+            if err_msg.trim().is_empty() {
+                let code = status.code().unwrap_or(-1);
+                return Err(AppError::DownloadFailed(format!("yt-dlp exit kodu: {}", code)));
+            }
+            Err(AppError::DownloadFailed(err_msg))
         }
     }
 
@@ -332,6 +409,7 @@ impl DownloadService {
             self.ffmpeg_dir.clone(),
             "--no-playlist".to_string(),
             "--no-overwrites".to_string(),
+            "--newline".to_string(),
             "--concurrent-fragments".to_string(),
             "8".to_string(),
         ];
@@ -390,6 +468,7 @@ impl DownloadService {
             "--yes-playlist".to_string(),
             "--no-overwrites".to_string(),
             "--ignore-errors".to_string(),
+            "--newline".to_string(),
             "--concurrent-fragments".to_string(),
             "8".to_string(),
         ];
@@ -459,6 +538,7 @@ impl DownloadService {
             "--no-playlist".to_string(),
             "--embed-thumbnail".to_string(),
             "--add-metadata".to_string(),
+            "--newline".to_string(),
             "--concurrent-fragments".to_string(),
             "8".to_string(),
         ];

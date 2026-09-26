@@ -217,6 +217,15 @@ fn is_media_ext(ext: &str) -> bool {
     )
 }
 
+pub async fn get_download_progress() -> Result<impl IntoResponse, AppError> {
+    let progress = crate::services::download_service::get_progress();
+    let response = ApiResponse::success(
+        serde_json::json!({ "progress": progress }),
+        "İndirme durumu",
+    );
+    Ok(Json(response))
+}
+
 pub async fn list_files(
     State(config): State<Config>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -224,11 +233,13 @@ pub async fn list_files(
 
     let current = settings::load();
     let mut files: Vec<DiskFile> = Vec::new();
+    let legacy_dir = "C:\\Video İndirici".to_string();
     let allowed: Vec<String> = vec![
         current.video_dir.clone(),
         current.music_dir.clone(),
         config.download_dir.clone(),
         config.music_dir.clone(),
+        legacy_dir,
     ];
     let mut dirs: Vec<String> = Vec::new();
     for d in allowed {
@@ -292,9 +303,11 @@ pub async fn delete_file(
 
     let target = std::path::Path::new(path);
     let current = settings::load();
+    let legacy_dir = "C:\\Video İndirici".to_string();
     let in_download = target.starts_with(&current.video_dir);
     let in_music = target.starts_with(&current.music_dir);
-    if !in_download && !in_music {
+    let in_legacy = target.starts_with(&legacy_dir);
+    if !in_download && !in_music && !in_legacy {
         return Err(AppError::InvalidUrl);
     }
     if !target.is_file() {

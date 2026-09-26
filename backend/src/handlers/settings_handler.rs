@@ -30,6 +30,11 @@ pub async fn update_settings(
         } else {
             payload.theme
         },
+        video_quality: if payload.video_quality.trim().is_empty() {
+            "best".to_string()
+        } else {
+            payload.video_quality
+        },
     };
 
     let _ = std::fs::create_dir_all(&updated.video_dir);
