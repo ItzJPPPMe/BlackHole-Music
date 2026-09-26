@@ -1,12 +1,15 @@
-const { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, dialog, shell, Notification } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
+const http = require('http');
 
 let mainWindow;
 let tray;
 let backendProcess;
 let compilerProcess;
+let downloadCount = 0;
+let lastNotificationSound = 0;
 
 const isDev = process.argv.includes('--dev');
 const resourcesPath = app.isPackaged ? path.join(process.resourcesPath, 'resources') : path.join(__dirname, '..', 'resources');
@@ -131,7 +134,9 @@ const menuTemplate = [
     label: 'Yardım',
     submenu: [
       { label: 'Hakkında', click: () => showAbout() },
-      { label: 'GitHub', click: () => shell.openExternal('https://github.com') }
+      { label: 'GitHub', click: () => shell.openExternal('https://github.com/ItzJPPPMe/BlackHole-Music') },
+      { label: 'Discord', click: () => shell.openExternal('https://discord.gg/mcj4kYUZJm') },
+      { label: 'Güncellemeleri Kontrol Et', click: () => showUpdateCheck() }
     ]
   }
 ];
@@ -140,13 +145,116 @@ function sendAction(action) {
   mainWindow && mainWindow.webContents.send(action);
 }
 
+function updateTrayCount() {
+  if (!tray) return;
+  const count = downloadCount > 0 ? downloadCount : 0;
+  tray.setToolTip(count > 0 ? `Video_Indirici — ${count} aktif indirme` : 'Video_Indirici');
+  const contextMenu = Menu.buildFromTemplate([
+    { label: count > 0 ? `Aktif indirme: ${count}` : 'İndirme yok', enabled: false },
+    { type: 'separator' },
+    { label: 'Göster', click: () => mainWindow && mainWindow.show() },
+    { label: 'Gizle', click: () => mainWindow && mainWindow.hide() },
+    { type: 'separator' },
+    { label: 'Çıkış', click: () => app.quit() }
+  ]);
+  tray.setContextMenu(contextMenu);
+}
+
+function showNotification(title, body, icon) {
+  if (!Notification.isSupported()) return;
+  const opts = { title, body: String(body || '') };
+  const iconPath = icon || path.join(__dirname, '..', 'assets', 'icons', 'icon.ico');
+  if (fs.existsSync(iconPath)) opts.icon = iconPath;
+  try { new Notification(opts).show(); } catch (e) { /* sessiz */ }
+}
+
+function playCompletionSound() {
+  try {
+    const now = Date.now();
+    if (now - lastNotificationSound < 1500) return;
+    lastNotificationSound = now;
+    const { execSync } = require('child_process');
+    let f = 0;
+    const beep = setInterval(() => {
+      f++;
+      try {
+        execSync('rundll32 user32.dll,MessageBeep');
+      } catch (e) {}
+      if (f >= 3) clearInterval(beep);
+    }, 350);
+  } catch (e) {}
+}
+
+function pollDownloads() {
+  const req = http.get('http://127.0.0.1:3000/api/downloads/progress', (res) => {
+    let body = '';
+    res.on('data', (c) => { body += c; });
+    res.on('end', () => {
+      try {
+        const json = JSON.parse(body);
+        const prog = json && json.data && typeof json.data.progress === 'number' ? json.data.progress : -1;
+        if (prog >= 0 && prog < 100) {
+          if (downloadCount === 0) { downloadCount = 1; updateTrayCount(); }
+        } else if (prog === 100) {
+          if (downloadCount > 0) {
+            downloadCount = 0;
+            updateTrayCount();
+            showNotification('İndirme tamamlandı', 'Dosya başarıyla indirildi.');
+            playCompletionSound();
+            sendAction('download-completed');
+          }
+        }
+      } catch (e) {}
+    });
+  });
+  req.on('error', () => {});
+  req.setTimeout(1000, () => req.destroy());
+}
+
+setInterval(pollDownloads, 2000);
+
 function showAbout() {
   dialog.showMessageBox(mainWindow, {
     type: 'info',
     title: 'Hakkında',
-    message: 'Video_Indirici v1.0.0',
-    detail: 'Electron tabanlı video indirme uygulaması'
+    message: 'Video_Indirici v1.3.0',
+    detail: 'Electron tabanlı video indirme uygulaması\nGitHub: https://github.com/ItzJPPPMe/BlackHole-Music'
   });
+}
+
+async function showUpdateCheck() {
+  try {
+    const res = await fetch('http://127.0.0.1:3000/api/update/check');
+    const json = await res.json();
+    const d = json?.data || {};
+    if (d.update_available) {
+      const choice = await dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'Güncelleme mevcut',
+        message: `Yeni sürüm: v${d.latest}`,
+        detail: `Mevcut sürüm: v${d.current}\nGitHub sayfasına gitmek istiyor musun?`,
+        buttons: ['GitHub\'a Git', 'Kapat'],
+        defaultId: 0,
+        cancelId: 1
+      });
+      if (choice.response === 0) {
+        shell.openExternal(d.repo_url + '/releases');
+      }
+    } else {
+      dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'Güncelleme yok',
+        message: `En son sürümü kullanıyorsunuz (v${d.current || '1.3.0'}).`
+      });
+    }
+  } catch (err) {
+    dialog.showMessageBox(mainWindow, {
+      type: 'error',
+      title: 'Kontrol başarısız',
+      message: 'Güncelleme kontrolü yapılamadı.',
+      detail: String(err && err.message ? err.message : err)
+    });
+  }
 }
 
 app.whenReady().then(() => {
@@ -203,5 +311,21 @@ ipcMain.handle('show-in-folder', async (event, filePath) => {
   if (!filePath || typeof filePath !== 'string') return { success: false, error: 'Yol yok' };
   if (!fs.existsSync(filePath)) return { success: false, error: 'Dosya bulunamadı' };
   shell.showItemInFolder(filePath);
+  return { success: true };
+});
+
+ipcMain.handle('notify', async (event, { title, body }) => {
+  showNotification(title || 'Bildirim', body || '');
+  return { success: true };
+});
+
+ipcMain.handle('play-sound', async () => {
+  playCompletionSound();
+  return { success: true };
+});
+
+ipcMain.handle('set-download-count', async (event, count) => {
+  downloadCount = typeof count === 'number' ? count : 0;
+  updateTrayCount();
   return { success: true };
 });

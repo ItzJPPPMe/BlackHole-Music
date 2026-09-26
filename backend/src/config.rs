@@ -16,7 +16,7 @@ fn app_data_dir() -> String {
         env::var("HOME").unwrap_or_else(|_| ".".to_string())
     });
     let dir = format!("{}\\VideoIndirici", base);
-    if std::path::Path::new(&dir).exists() == false {
+    if !std::path::Path::new(&dir).exists() {
         let _ = std::fs::create_dir_all(&dir);
     }
     dir

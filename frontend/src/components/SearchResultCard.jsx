@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 const PLATFORM_LABELS = {
   youtube: { label: 'YouTube', className: 'youtube' },
@@ -8,6 +8,7 @@ const PLATFORM_LABELS = {
 
 export default function SearchResultCard({ item, onDownload, onSave, onAddToPlaylist }) {
   const platform = PLATFORM_LABELS[item.platform] || PLATFORM_LABELS.youtube;
+  const [videoQuality, setVideoQuality] = useState('best');
 
   const formatDuration = (dur) => {
     if (!dur) return '';
@@ -44,6 +45,22 @@ export default function SearchResultCard({ item, onDownload, onSave, onAddToPlay
           <span className={`platform-dot ${platform.className}`}></span>
           {platform.label}
         </div>
+        <div className="result-quality">
+          <select
+            className="quality-select"
+            value={videoQuality}
+            onChange={(e) => setVideoQuality(e.target.value)}
+            title="Video kalitesi"
+          >
+            <option value="best">En iyi</option>
+            <option value="2160">4K</option>
+            <option value="1440">1440p</option>
+            <option value="1080">1080p</option>
+            <option value="720">720p</option>
+            <option value="480">480p</option>
+            <option value="360">360p</option>
+          </select>
+        </div>
       </div>
 
       <div className="result-actions">
@@ -56,7 +73,7 @@ export default function SearchResultCard({ item, onDownload, onSave, onAddToPlay
         </button>
         <button
           className="result-btn video-btn"
-          onClick={() => onDownload(item.url, 'video', 'mp4')}
+          onClick={() => onDownload(item.url, 'video', 'mp4', videoQuality)}
           title={`Video olarak indir (MP4)${item.platform !== 'youtube' ? ' - yt-dlp ile' : ''}`}
         >
           ▶

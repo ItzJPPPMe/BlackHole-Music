@@ -14,6 +14,7 @@ pub async fn get_settings() -> Result<impl IntoResponse, AppError> {
 pub async fn update_settings(
     Json(payload): Json<settings::Settings>,
 ) -> Result<impl IntoResponse, AppError> {
+    let current = settings::load();
     let updated = settings::Settings {
         video_dir: if payload.video_dir.trim().is_empty() {
             "C:\\Video_Indirici".to_string()
@@ -35,6 +36,28 @@ pub async fn update_settings(
         } else {
             payload.video_quality
         },
+        dark_mode: payload.dark_mode,
+        rate_limit: payload.rate_limit,
+        audio_bitrate: if payload.audio_bitrate.trim().is_empty() {
+            "0".to_string()
+        } else {
+            payload.audio_bitrate
+        },
+        subtitles: payload.subtitles,
+        sub_langs: if payload.sub_langs.trim().is_empty() {
+            "tr,en,en.*".to_string()
+        } else {
+            payload.sub_langs
+        },
+        embed_thumbnail: payload.embed_thumbnail,
+        add_metadata: payload.add_metadata,
+        concurrent_fragments: if payload.concurrent_fragments == 0 {
+            current.concurrent_fragments
+        } else {
+            payload.concurrent_fragments
+        },
+        verify_ssl: payload.verify_ssl,
+        prefer_av1: payload.prefer_av1,
     };
 
     let _ = std::fs::create_dir_all(&updated.video_dir);

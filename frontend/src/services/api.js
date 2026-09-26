@@ -19,11 +19,11 @@ export async function requestDownload(url, quality, format, folder, downloadType
   return handleResponse(response);
 }
 
-export async function requestPlaylistDownload(url, quality, format, folder, albumStructure) {
+export async function requestPlaylistDownload(url, quality, format, folder, albumStructure, trackIndices) {
   const response = await fetch(`${API_BASE}/playlist/download`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url, quality, format, folder, album_structure: albumStructure }),
+    body: JSON.stringify({ url, quality, format, folder, album_structure: albumStructure, track_indices: trackIndices }),
   });
   return handleResponse(response);
 }
@@ -84,11 +84,27 @@ export async function getDownloadProgress() {
   return handleResponse(response);
 }
 
+export async function cancelDownload() {
+  const response = await fetch(`${API_BASE}/downloads/cancel`, {
+    method: 'POST',
+  });
+  return handleResponse(response);
+}
+
 export async function deleteDiskFile(path) {
   const response = await fetch(`${API_BASE}/files/delete`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path }),
+  });
+  return handleResponse(response);
+}
+
+export async function renameDiskFile(path, newName) {
+  const response = await fetch(`${API_BASE}/files/rename`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, new_name: newName }),
   });
   return handleResponse(response);
 }
@@ -103,6 +119,47 @@ export async function updateAppSettings(settings) {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(settings),
+  });
+  return handleResponse(response);
+}
+
+export async function getAppVersion() {
+  const response = await fetch(`${API_BASE}/version`);
+  return handleResponse(response);
+}
+
+export async function checkForUpdate() {
+  const response = await fetch(`${API_BASE}/update/check`);
+  return handleResponse(response);
+}
+
+export async function getVideoInfo(url) {
+  const response = await fetch(`${API_BASE}/video/info`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
+  });
+  return handleResponse(response);
+}
+
+export async function startBatchDownload(items) {
+  const response = await fetch(`${API_BASE}/downloads/batch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items }),
+  });
+  return handleResponse(response);
+}
+
+export async function getStreamFileUrl(path) {
+  return `${API_BASE}/files/stream?path=${encodeURIComponent(path)}`;
+}
+
+export async function getLyrics(title, artist) {
+  const response = await fetch(`${API_BASE}/lyrics`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, artist, duration: 0 }),
   });
   return handleResponse(response);
 }

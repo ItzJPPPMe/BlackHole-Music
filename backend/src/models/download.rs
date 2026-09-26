@@ -29,6 +29,7 @@ pub struct PlaylistRequest {
     pub quality: Option<String>,
     pub folder: Option<String>,
     pub album_structure: Option<bool>,
+    pub track_indices: Option<Vec<usize>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -80,6 +81,27 @@ pub struct StreamRequest {
 pub struct SearchRequest {
     pub query: String,
     pub limit: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct VideoInfoRequest {
+    pub url: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BatchItem {
+    pub url: String,
+    pub quality: Option<String>,
+    pub format: Option<String>,
+    pub folder: Option<String>,
+    pub download_type: Option<String>,
+    pub album_structure: Option<bool>,
+    pub track_indices: Option<Vec<usize>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BatchRequest {
+    pub items: Vec<BatchItem>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

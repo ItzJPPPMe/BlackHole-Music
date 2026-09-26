@@ -6,6 +6,14 @@ fn default_quality() -> String {
     "best".to_string()
 }
 
+fn default_bitrate() -> String {
+    "0".to_string()
+}
+
+fn default_sub_langs() -> String {
+    "tr,en,en.*".to_string()
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Settings {
     #[serde(default)]
@@ -16,6 +24,34 @@ pub struct Settings {
     pub theme: String,
     #[serde(default = "default_quality")]
     pub video_quality: String,
+    #[serde(default = "default_dark")]
+    pub dark_mode: bool,
+    #[serde(default)]
+    pub rate_limit: String,
+    #[serde(default = "default_bitrate")]
+    pub audio_bitrate: String,
+    #[serde(default)]
+    pub subtitles: bool,
+    #[serde(default = "default_sub_langs")]
+    pub sub_langs: String,
+    #[serde(default)]
+    pub embed_thumbnail: bool,
+    #[serde(default)]
+    pub add_metadata: bool,
+    #[serde(default = "default_concurrent")]
+    pub concurrent_fragments: u32,
+    #[serde(default)]
+    pub verify_ssl: bool,
+    #[serde(default)]
+    pub prefer_av1: bool,
+}
+
+fn default_concurrent() -> u32 {
+    8
+}
+
+fn default_dark() -> bool {
+    true
 }
 
 impl Default for Settings {
@@ -25,6 +61,16 @@ impl Default for Settings {
             music_dir: "C:\\Video_Indirici".to_string(),
             theme: "blue".to_string(),
             video_quality: "best".to_string(),
+            dark_mode: true,
+            rate_limit: String::new(),
+            audio_bitrate: "0".to_string(),
+            subtitles: false,
+            sub_langs: "tr,en,en.*".to_string(),
+            embed_thumbnail: true,
+            add_metadata: true,
+            concurrent_fragments: 8,
+            verify_ssl: true,
+            prefer_av1: false,
         }
     }
 }
